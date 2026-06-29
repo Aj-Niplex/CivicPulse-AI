@@ -11,6 +11,18 @@ interface AIAnalysisCardProps {
 }
 
 export const AIAnalysisCard: React.FC<AIAnalysisCardProps> = ({ analysis, isLoading }) => {
+  if (analysis?.analysisStatus === 'failed') {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6 text-center space-y-2">
+          <AlertTriangle className="w-8 h-8 text-red-500 mx-auto" />
+          <h3 className="text-lg font-semibold text-red-900">AI Analysis Failed</h3>
+          <p className="text-sm text-red-600">Unable to analyze this issue. Please try reporting again.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading || !analysis || analysis.analysisStatus === 'pending' || analysis.analysisStatus === 'processing') {
     return (
       <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100 relative overflow-hidden">

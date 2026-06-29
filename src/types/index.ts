@@ -47,4 +47,24 @@ export interface Issue {
   voteCount: number;
   commentCount: number;
   feedbackSummary?: string;
+  acceptedAIPlan?: boolean;
+  acceptedAt?: string;
+  acceptedBy?: string;
+}
+
+export interface Comment {
+  commentId: string;
+  issueId: string;
+  userId: string;
+  displayName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  issueId: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
 }

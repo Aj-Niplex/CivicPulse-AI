@@ -6,7 +6,7 @@ interface IssueState {
   issues: Issue[];
   loading: boolean;
   subscribeToIssues: (societyId: string) => () => void;
-  updateIssueStatus: (issueId: string, status: IssueStatus) => Promise<void>;
+  updateIssueStatus: (issueId: string, status: IssueStatus, assignedCommittee?: string) => Promise<void>;
   voteIssue: (issueId: string, userId: string) => Promise<void>;
 }
 
@@ -19,8 +19,8 @@ export const useIssueStore = create<IssueState>((set) => ({
       set({ issues, loading: false });
     });
   },
-  updateIssueStatus: async (issueId, status) => {
-    await issueService.updateIssueStatus(issueId, status);
+  updateIssueStatus: async (issueId, status, assignedCommittee) => {
+    await issueService.updateIssueStatus(issueId, status, assignedCommittee);
   },
   voteIssue: async (issueId, userId) => {
     await issueService.voteIssue(issueId, userId);

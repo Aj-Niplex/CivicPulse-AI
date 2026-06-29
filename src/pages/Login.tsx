@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Navigate } from 'react-router-dom';
 import { Building, ShieldCheck } from 'lucide-react';
@@ -6,17 +6,28 @@ import { Button } from '../components/ui/Button';
 
 export const Login: React.FC = () => {
   const { user, loginAsResident, loginAsAdmin, loading } = useAuthStore();
+  const [error, setError] = useState<string | null>(null);
 
   if (user) {
     return <Navigate to={user.role === "admin" ? "/admin" : "/"} replace />;
   }
 
   const handleResidentLogin = async () => {
-    await loginAsResident();
+    setError(null);
+    try {
+      await loginAsResident();
+    } catch {
+      setError('Sign-in failed. Please try again.');
+    }
   };
 
   const handleAdminLogin = async () => {
-    await loginAsAdmin();
+    setError(null);
+    try {
+      await loginAsAdmin();
+    } catch {
+      setError('Sign-in failed. Please try again.');
+    }
   };
 
   return (
@@ -33,6 +44,9 @@ export const Login: React.FC = () => {
         </div>
 
         <div className="mt-8 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+          )}
           <Button
             onClick={handleResidentLogin}
             isLoading={loading}

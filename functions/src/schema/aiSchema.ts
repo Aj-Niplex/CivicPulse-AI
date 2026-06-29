@@ -7,12 +7,12 @@ export const aiAnalysisSchema = z.object({
   priority: z.enum(['Urgent', 'High', 'Normal', 'Low']),
   confidence: z.number().min(0).max(100),
   suggestedCommittee: z.enum(['Maintenance', 'Security', 'Sanitation', 'Works', 'General Administration']),
-  temporaryActions: z.array(z.string()).max(3),
+  temporaryActions: z.array(z.string()).max(5),
   actionPlan: z.array(z.object({
     step: z.string(),
     timeline: z.string(),
     responsibility: z.string()
-  })).max(5),
+  })).max(10),
   estimatedCost: z.string().optional(),
   estimatedResolutionTime: z.string().optional(),
   reasoning: z.string(),

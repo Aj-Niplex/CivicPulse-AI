@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useIssueStore } from '../store/useIssueStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useNotificationStore } from '../store/useNotificationStore';
 import { IssueCard } from '../components/issues/IssueCard';
 import { Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -9,6 +10,7 @@ import { Spinner } from '../components/ui/Loading';
 export const ResidentDashboard: React.FC = () => {
   const { issues, loading, subscribeToIssues } = useIssueStore();
   const { user } = useAuthStore();
+  const syncFromIssues = useNotificationStore(s => s.syncFromIssues);
 
   useEffect(() => {
     if (user?.societyId) {
@@ -16,6 +18,12 @@ export const ResidentDashboard: React.FC = () => {
       return () => unsubscribe();
     }
   }, [subscribeToIssues, user?.societyId]);
+
+  useEffect(() => {
+    if (user && issues.length > 0) {
+      syncFromIssues(issues, user.userId);
+    }
+  }, [issues, user, syncFromIssues]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
@@ -43,7 +51,6 @@ export const ResidentDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Action Button */}
       <Link
         to="/report"
         className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700"

@@ -7,6 +7,7 @@ const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
 export const summarizeFeedback = onDocumentCreated({
   document: 'issues/{issueId}/comments/{commentId}',
+  region: 'asia-south2',
   secrets: [GEMINI_API_KEY]
 }, async (event) => {
   const snapshot = event.data;
@@ -21,12 +22,10 @@ export const summarizeFeedback = onDocumentCreated({
 
   if (!issue) return;
 
-  const commentCount = (issue.commentCount || 0) + 1;
-  // Update comment count
-  await issueRef.update({ commentCount });
+  const commentCount = issue.commentCount || 0;
 
   // Only summarize every 5 comments to save AI calls
-  if (commentCount % 5 !== 0) return;
+  if (commentCount === 0 || commentCount % 5 !== 0) return;
 
   const commentsSnapshot = await db.collection('issues').doc(issueId).collection('comments').orderBy('createdAt', 'desc').limit(10).get();
   const commentsList = commentsSnapshot.docs.map(d => d.data().text).join('\n- ');

@@ -8,7 +8,8 @@ interface AuthState {
   loginAsResident: () => Promise<void>;
   loginAsAdmin: () => Promise<void>;
   logout: () => Promise<void>;
-  initAuthListener: () => void;
+  updateUser: (updates: Partial<User>) => void;
+  initAuthListener: () => () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -21,6 +22,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user, loading: false });
     } catch (e) {
       set({ loading: false });
+      throw e;
     }
   },
   loginAsAdmin: async () => {
@@ -30,6 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user, loading: false });
     } catch (e) {
       set({ loading: false });
+      throw e;
     }
   },
   logout: async () => {
@@ -37,10 +40,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     await authService.logout();
     set({ user: null, loading: false });
   },
+  updateUser: (updates) => {
+    set(state => ({
+      user: state.user ? { ...state.user, ...updates } : null,
+    }));
+  },
   initAuthListener: () => {
-    authService.onAuthStateChange((user) => {
+    const unsubscribe = authService.onAuthStateChange((user) => {
       set({ user, loading: false });
-
     });
+    return unsubscribe;
   }
 }));

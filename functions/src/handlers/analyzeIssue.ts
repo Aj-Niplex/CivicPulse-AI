@@ -6,15 +6,17 @@ import { aiAnalysisSchema } from '../schema/aiSchema';
 
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
-export const analyzeIssue = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds: 30 }, async (request) => {
+export const analyzeIssue = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds: 30, region: 'asia-south2' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
 
-  const { imageBase64, issueId, description } = request.data;
+  const { imageBase64, issueId, description, mimeType } = request.data;
   if (!imageBase64 || !issueId) {
     throw new HttpsError('invalid-argument', 'Missing imageBase64 or issueId');
   }
+
+  const imageMime = mimeType || 'image/jpeg';
 
   try {
     const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value() });
@@ -43,13 +45,13 @@ export const analyzeIssue = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds: 
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash',
       contents: [
         {
           role: 'user',
           parts: [
             { text: prompt },
-            { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }
+            { inlineData: { mimeType: imageMime, data: imageBase64 } }
           ]
         }
       ],
@@ -57,6 +59,8 @@ export const analyzeIssue = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds: 
         responseMimeType: 'application/json'
       }
     });
+    console.log("Gemini response:", response);
+    console.log("Gemini text:", response.text);
 
     const text = response.text;
     if (!text) throw new Error("Empty response from Gemini");
@@ -77,12 +81,13 @@ export const analyzeIssue = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds: 
       status: 'Reported'
     });
 
-    return { success: true, analysis: validatedData };
-  } catch (error: any) {
+    return { success: true, analysis: { ...validatedData, analysisStatus: 'completed' as const } };
+  } catch (error: unknown) {
     console.error('AI Analysis Error:', error);
-    await db.collection('issues').doc(issueId).update({
-      'aiAnalysis.analysisStatus': 'failed'
-    });
-    throw new HttpsError('internal', error.message || 'AI analysis failed');
+    await db.collection('issues').doc(issueId).set({
+      aiAnalysis: { analysisStatus: 'failed' },
+    }, { merge: true });
+    const message = error instanceof Error ? error.message : 'AI analysis failed';
+    throw new HttpsError('internal', message);
   }
 });

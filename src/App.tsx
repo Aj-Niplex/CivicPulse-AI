@@ -7,6 +7,7 @@ import { ReportIssue } from './pages/ReportIssue';
 import { IssueDetails } from './pages/IssueDetails';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { Settings } from './pages/Settings';
+import { NotFound } from './pages/NotFound';
 import { useAuthStore } from './store/useAuthStore';
 
 // Protected Route Component
@@ -29,7 +30,8 @@ function App() {
   const { user, initAuthListener } = useAuthStore();
 
   useEffect(() => {
-    initAuthListener();
+    const unsubscribe = initAuthListener();
+    return () => unsubscribe();
   }, [initAuthListener]);
 
   return (
@@ -70,6 +72,8 @@ function App() {
                 <Settings />
               </ProtectedRoute>
             } />
+
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
       </div>

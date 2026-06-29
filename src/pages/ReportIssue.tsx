@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { useIssueStore } from '../store/useIssueStore';
 import { issueService } from '../services/issueService';
 import { aiService } from '../services/aiService';
 import { storageService } from '../services/storageService';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
-import { Camera, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { Camera, Image as ImageIcon, ArrowRight, AlertCircle } from 'lucide-react';
 import { AIAnalysisCard } from '../components/ai/AIAnalysisCard';
 import { AIAnalysis } from '../types';
 
@@ -18,13 +17,14 @@ export const ReportIssue: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiStatusMessage, setAiStatusMessage] = useState('');
   const [analysisResult, setAnalysisResult] = useState<AIAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [createdIssueId, setCreatedIssueId] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  useIssueStore();
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[ReportIssue] Image Upload fired');
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
@@ -36,49 +36,72 @@ export const ReportIssue: React.FC = () => {
   const handleProcessAI = async () => {
     if (!imageFile || !user) return;
     setIsProcessing(true);
+    setAnalysisError(null);
     setStep(3);
 
-    try {
-      setAiStatusMessage('Uploading...');
-      const imageUrl = await storageService.uploadImage(imageFile, user.societyId, `temp-${Date.now()}`);
+    let intervalRef: ReturnType<typeof setInterval> | null = null;
 
-      setAiStatusMessage('Analyzing Image...');
+    try {
+      setAiStatusMessage('Creating issue...');
       const newIssueId = await issueService.createIssue({
         societyId: user.societyId,
         reportedBy: user.userId,
-        imageUrl,
+        imageUrl: '',
         locationLabel: 'Auto-detected location',
       });
       setCreatedIssueId(newIssueId);
 
-      // Simulate real-time progress while waiting for AI
+      setAiStatusMessage('Uploading...');
+      const imageUrl = await storageService.uploadImage(imageFile, user.societyId, newIssueId);
+      await issueService.updateIssueImage(newIssueId, imageUrl);
+
+      setAiStatusMessage('Analyzing Image...');
+
+      // Rotate status messages while AI processes
       const statuses = ['Detecting Issue...', 'Estimating Severity...', 'Generating Resolution Plan...'];
       let i = 0;
-      const interval = setInterval(() => {
+      intervalRef = setInterval(() => {
         if (i < statuses.length) {
           setAiStatusMessage(statuses[i]);
           i++;
         } else {
-          clearInterval(interval);
+          clearInterval(intervalRef!);
         }
       }, 2000);
 
+      console.log('[ReportIssue] 4 Converting to base64...');
       const base64 = await storageService.fileToBase64(imageFile);
-      const analysis = await aiService.analyzeIssue(newIssueId, base64, '');
+      console.log('[ReportIssue] Calling AI...');
+      const analysis = await aiService.analyzeIssue(newIssueId, base64, '', imageFile.type);
+      console.log('[ReportIssue] 6 AI returned:', analysis);
 
-      clearInterval(interval);
+      clearInterval(intervalRef);
+      intervalRef = null;
       setAiStatusMessage('Done');
       setAnalysisResult(analysis);
     } catch (error) {
-      console.error("Error processing AI:", error);
-      setAiStatusMessage('Failed');
+      console.error('[ReportIssue] Error processing AI:', error);
+      if (intervalRef) {
+        clearInterval(intervalRef);
+        intervalRef = null;
+      }
+      setAiStatusMessage('');
+      setAnalysisError('AI analysis failed. Please check your connection and try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleSubmit = () => {
+    if (!createdIssueId) return;
     navigate(`/issue/${createdIssueId}`);
+  };
+
+  const handleRetry = () => {
+    setStep(2);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+    setAiStatusMessage('');
   };
 
   return (
@@ -100,11 +123,12 @@ export const ReportIssue: React.FC = () => {
             </p>
 
             <div className="flex gap-4 w-full max-w-xs">
-              <label className="flex-1">
-                <Button className="w-full pointer-events-none">
-                  <ImageIcon className="w-4 h-4 mr-2" /> Upload Photo
-                </Button>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <input id="issue-image-upload" type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <label htmlFor="issue-image-upload" className="flex-1 cursor-pointer">
+                <div className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center font-medium transition-colors">
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  Upload Photo
+                </div>
               </label>
             </div>
           </CardContent>
@@ -139,11 +163,23 @@ export const ReportIssue: React.FC = () => {
                 <p className="text-sm text-gray-500">Please wait while Gemini processes the image.</p>
               </CardContent>
             </Card>
+          ) : analysisError ? (
+            /* Error State — previously this was an infinite spinner */
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <AlertCircle className="w-10 h-10 text-red-500" />
+                <div>
+                  <h3 className="text-lg font-semibold text-red-900">Analysis Failed</h3>
+                  <p className="text-sm text-red-600 mt-1">{analysisError}</p>
+                </div>
+                <Button variant="outline" onClick={handleRetry}>Try Again</Button>
+              </CardContent>
+            </Card>
           ) : (
-            <AIAnalysisCard analysis={analysisResult || undefined} isLoading={isProcessing} />
+            <AIAnalysisCard analysis={analysisResult || undefined} isLoading={false} />
           )}
 
-          {!isProcessing && analysisResult && (
+          {!isProcessing && !analysisError && analysisResult && (
             <Button onClick={handleSubmit} className="w-full h-14 text-lg">
               Submit to Society
             </Button>
